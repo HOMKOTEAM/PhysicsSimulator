@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Мобильный и ПК физический симулятор</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* чтобы не было скролла */
+  }
+  #canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+  }
+  #buttons {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-wrap: wrap;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 10px;
+    padding: 5px;
+    z-index: 10;
+  }
+  button {
+    margin: 5px;
+    padding: 8px 12px;
+    font-size: 14px;
+    cursor: pointer;
+    border: none;
+    background: #007bff;
+    color: white;
+    border-radius: 5px;
+    transition: background 0.3s;
+  }
+  button:hover {
+    background: #0056b3;
+  }
+</style>
+</head>
+<body>
+
+<!-- Кнопки выбора фигуры -->
+<div id="buttons">
+  <button data-shape="circle">Круг</button>
+  <button data-shape="square">Квадрат</button>
+  <button data-shape="triangle">Треугольник</button>
+</div>
+
+<!-- Холст -->
+<canvas id="canvas"></canvas>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+let width = window.innerWidth;
+let height = window.innerHeight;
+canvas.width = width;
+canvas.height = height;
+
+// Обновление размеров холста при ресайзе
+window.addEventListener('resize', () => {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  canvas.width = width;
+  canvas.height = height;
+});
+
+// Текущий выбранный тип фигуры
+let currentShapeType = 'circle';
+
+// Обработка кнопок выбора
+document.querySelectorAll('#buttons button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentShapeType = btn.dataset.shape;
+  });
+});
+
+// Обработка касаний и кликов
+canvas.addEventListener('click', e => {
+  spawnShape(e.offsetX, e.offsetY);
+});
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length > 0) {
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    spawnShape(x, y);
+  }
+});
+
+// Создание фигуры с начальной скоростью
+function spawnShape(x, y) {
+  const speed = 3;
+  const angle = Math.random() * Math.PI * 2;
+  const vx = Math.cos(angle) * speed;
+  const vy = Math.sin(angle) * speed;
+  if (currentShapeType === 'circle') {
+    objects.push(new Circle(x, y, vx, vy));
+  } else if (currentShapeType === 'square') {
+    objects.push(new Square(x, y, vx, vy));
+  } else if (currentShapeType === 'triangle') {
+    objects.push(new Triangle(x, y, vx, vy));
+  }
+}
+
+// базовый класс
+class Shape {
+  constructor(x, y, vx, vy) {
+    this.x = x;
+    this.y = y;
+    this.vx = vx;
+    this.vy = vy;
+  }
+
+  update() {
+    this.vy += 0.2; // слабое гравитационное ускорение для наглядности
+    this.x += this.vx;
+    this.y += this.vy;
+
+    const r = this.getRadius();
+
+    // Обработка столкновений с границами
+    if (this.y + r > height) {
+      this.y = height - r;
+      this.vy *= -0.8; // энергия после удара
+    }
+    if (this.y - r < 0) {
+      this.y = r;
+      this.vy *= -0.8;
+    }
+    if (this.x + r > width) {
+      this.x = width - r;
+      this.vx *= -0.8;
+    }
+    if (this.x - r < 0) {
+      this.x = r;
+      this.vx *= -0.8;
+    }
+  }
+  draw() {}
+  getRadius() {
+    return 20;
+  }
+}
+
+// Круг
+class Circle extends Shape {
+  constructor(x, y, vx, vy) {
+    super(x, y, vx, vy);
+    this.radius = 20;
+  }
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+    ctx.fillStyle = 'blue';
+    ctx.fill();
+  }
+  getRadius() {
+    return this.radius;
+  }
+}
+
+// Квадрат
+class Square extends Shape {
+  constructor(x, y, vx, vy) {
+    super(x, y, vx, vy);
+    this.size = 40;
+  }
+  draw() {
+    ctx.fillStyle = 'green';
+    ctx.fillRect(this.x - this.size/2, this.y - this.size/2, this.size, this.size);
+  }
+  getRadius() {
+    return Math.sqrt(2) * (this.size/2);
+  }
+}
+
+// Треугольник
+class Triangle extends Shape {
+  constructor(x, y, vx, vy) {
+    super(x, y, vx, vy);
+    this.size = 40;
+  }
+  draw() {
+    ctx.fillStyle = 'red';
+    ctx.beginPath();
+    ctx.moveTo(this.x, this.y - this.size/2);
+    ctx.lineTo(this.x - this.size/2, this.y + this.size/2);
+    ctx.lineTo(this.x + this.size/2, this.y + this.size/2);
+    ctx.closePath();
+    ctx.fill();
+  }
+  getRadius() {
+    return this.size/2;
+  }
+}
+
+const objects = [];
+
+function animate() {
+  ctx.clearRect(0, 0, width, height);
+  for (let obj of objects) {
+    obj.update();
+    obj.draw();
+  }
+  requestAnimationFrame(animate);
+}
+
+animate();
+</script>
+
+</body>
+</html>
